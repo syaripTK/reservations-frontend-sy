@@ -16,6 +16,30 @@ const UserReservations = () => {
   const [assets, setAssets] = useState([]);
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+  const startRef = useRef(null);
+  const endRef = useRef(null);
+  const handleStartFocus = () => {
+    if (startRef.current) {
+      try {
+        startRef.current.focus();
+        if (typeof startRef.current.showPicker === 'function')
+          startRef.current.showPicker();
+      } catch (e) {
+        /* ignore */
+      }
+    }
+  };
+  const handleEndFocus = () => {
+    if (endRef.current) {
+      try {
+        endRef.current.focus();
+        if (typeof endRef.current.showPicker === 'function')
+          endRef.current.showPicker();
+      } catch (e) {
+        /* ignore */
+      }
+    }
+  };
   const [loading, setLoading] = useState(false);
   const { search } = useOutletContext() || { search: '' };
 
@@ -159,8 +183,13 @@ const UserReservations = () => {
             <label htmlFor="start-date">START_DATE</label>
             <input
               id="start-date"
+              name="start_date"
+              className="input-start-date"
+              ref={startRef}
               type="date"
               value={startDate}
+              onClick={(e) => e.stopPropagation()}
+              onFocus={handleStartFocus}
               onChange={(e) => setStartDate(e.target.value)}
               required
             />
@@ -169,8 +198,13 @@ const UserReservations = () => {
             <label htmlFor="end-date">END_DATE</label>
             <input
               id="end-date"
+              name="end_date"
+              className="input-end-date"
+              ref={endRef}
               type="date"
               value={endDate}
+              onClick={(e) => e.stopPropagation()}
+              onFocus={handleEndFocus}
               onChange={(e) => setEndDate(e.target.value)}
               required
             />
