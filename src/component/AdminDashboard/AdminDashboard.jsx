@@ -13,6 +13,13 @@ import {
 } from 'chart.js';
 import { Doughnut, Bar, Line } from 'react-chartjs-2';
 import './AdminDashboard.css';
+import {
+  notyfSuccess,
+  showErrorNotification,
+  showSuccessNotification,
+} from '../../utils/notyf';
+import axiosInstance from '../../utils/axiosInstance';
+import Swal from 'sweetalert2';
 
 ChartJS.register(
   ArcElement,
@@ -79,6 +86,12 @@ const AdminDashboard = ({ statsData, summaryData }) => {
     overdueReservations,
     userActivity,
   } = summaryData;
+
+  const [localPending, setLocalPending] = useState(pendingReservations ?? []);
+
+  useEffect(() => {
+    setLocalPending(pendingReservations ?? []);
+  }, [pendingReservations]);
 
   const doughnutData = {
     labels: ['PENDING', 'APPROVED', 'REJECTED', 'RETURNED'],
@@ -200,6 +213,70 @@ const AdminDashboard = ({ statsData, summaryData }) => {
     },
   };
 
+  const handleApprove = async (id) => {
+    try {
+      const approve = await axiosInstance.put(
+        `${import.meta.env.PUBLIC_API_URL}/api/v1/reservations/${id}/approve`,
+      );
+      showSuccessNotification(approve.data.message);
+      setLocalPending((prev) => prev.filter((p) => p.id !== id));
+    } catch (error) {
+      console.error(error.response);
+      showErrorNotification(error.response.data.message || 'ERROR_OCCURRED');
+    }
+  };
+
+  const handleReject = async (id) => {
+    const { value: rejectionReason } = await Swal.fire({
+      title: '<div class="swal-brutalist-title">REJECT // RESERVATION</div>',
+      html: `
+        <div class="swal-brutalist-body">
+          <div class="input-group">
+            <label>REJECTION REASON</label>
+            <textarea 
+              id="swal-rejection-note" 
+              class="custom-swal-textarea" 
+              placeholder="Explain why this request is being denied..."></textarea>
+          </div>
+        </div>
+      `,
+      background: '#010101',
+      showCancelButton: true,
+      confirmButtonText: 'CONFIRM_REJECTION',
+      cancelButtonText: 'ABORT',
+      buttonsStyling: false,
+      customClass: {
+        popup: 'swal-brutalist-popup',
+        confirmButton: 'swal-btn-reject-confirm',
+        cancelButton: 'swal-btn-cancel',
+      },
+      preConfirm: () => {
+        const reason = document.getElementById('swal-rejection-note').value;
+        if (!reason) {
+          return Swal.showValidationMessage('YOU MUST PROVIDE A REASON');
+        }
+        return reason;
+      },
+    });
+
+    if (rejectionReason) {
+      try {
+        const response = await axiosInstance.put(
+          `${import.meta.env.PUBLIC_API_URL}/api/v1/reservations/${id}/reject`,
+          { reject_reason: rejectionReason },
+        );
+
+        notyfSuccess(response.data.message || 'RESERVATION REJECTED');
+        setLocalPending((prev) => prev.filter((p) => p.id !== id));
+      } catch (error) {
+        console.error(error.response);
+        showErrorNotification(
+          error.response?.data?.message || 'FAILED TO REJECT RESERVATION',
+        );
+      }
+    }
+  };
+
   return (
     <div className="ad-wrapper">
       <header className="ad-header">
@@ -295,8 +372,8 @@ const AdminDashboard = ({ statsData, summaryData }) => {
             onClick={() => setActiveTab(tab)}
           >
             {tab.toUpperCase()}
-            {tab === 'pending' && pendingReservations?.length > 0 && (
-              <span className="ad-tab-badge">{pendingReservations.length}</span>
+            {tab === 'pending' && localPending?.length > 0 && (
+              <span className="ad-tab-badge">{localPending.length}</span>
             )}
             {tab === 'active' && overdueReservations?.length > 0 && (
               <span className="ad-tab-badge ad-tab-badge--red">
@@ -418,10 +495,10 @@ const AdminDashboard = ({ statsData, summaryData }) => {
 
       {activeTab === 'pending' && (
         <div className="ad-pending-grid">
-          {pendingReservations?.length === 0 ? (
+          {localPending?.length === 0 ? (
             <EmptyState label="NO_PENDING_RESERVATIONS" />
           ) : (
-            pendingReservations?.map((r, i) => (
+            localPending?.map((r, i) => (
               <div
                 key={r.id}
                 className="ad-pending-card"
@@ -457,8 +534,18 @@ const AdminDashboard = ({ statsData, summaryData }) => {
                   </div>
                 </div>
                 <div className="ad-pc-actions">
-                  <button className="ad-btn ad-btn--approve">✓ APPROVE</button>
-                  <button className="ad-btn ad-btn--reject">✕ REJECT</button>
+                  <button
+                    className="ad-btn ad-btn--approve"
+                    onClick={() => handleApprove(r.id)}
+                  >
+                    ✓ APPROVE
+                  </button>
+                  <button
+                    className="ad-btn ad-btn--reject"
+                    onClick={() => handleReject(r.id)}
+                  >
+                    ✕ REJECT
+                  </button>
                 </div>
               </div>
             ))
